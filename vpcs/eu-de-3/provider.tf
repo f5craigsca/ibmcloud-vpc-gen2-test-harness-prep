@@ -1,4 +1,19 @@
+variable "api_key" {
+  default = ""
+}
+
+variable "region" {
+  default     = "eu-de"
+  description = "Region to test."
+}
+
+variable "zone" {
+  default     = "3"
+  description = "Zones in each region to test."
+}
+
 provider "ibm" {
-  generation = 2
-  region     = "eu-de"
+  ibmcloud_api_key = var.api_key
+  generation       = 2
+  region           = var.region
 }
