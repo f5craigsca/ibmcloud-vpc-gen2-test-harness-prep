@@ -17,8 +17,9 @@
 # limitations under the License.
 #
 """
-This module contains the logic to create VPC images from
-F5 public COS image URLs.
+This module contains the logic to create VPC resources for the test harness.
+
+These resources include VPCs, subnets, and keys.
 """
 
 import sys
