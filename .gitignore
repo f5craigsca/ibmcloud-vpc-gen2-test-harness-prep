@@ -30,3 +30,4 @@ override.tf.json
 
 .venv
 .vscode
+zone-resources.json

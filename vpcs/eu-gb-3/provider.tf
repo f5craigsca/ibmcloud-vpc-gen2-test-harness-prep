@@ -2,6 +2,14 @@ variable "api_key" {
   default = ""
 }
 
+variable "ssh_public_key" {
+  default = ""
+}
+
+variable "ssh_private_key" {
+  default = ""
+}
+
 variable "region" {
   default     = "eu-gb"
   description = "Region to test."

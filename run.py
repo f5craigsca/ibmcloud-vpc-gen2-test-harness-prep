@@ -30,6 +30,8 @@ import logging
 import json
 import python_terraform as pt
 
+from Crypto.PublicKey import RSA
+
 LOG = logging.getLogger('ibmcloud_vpc_gen2_test_harness_prep')
 LOG.setLevel(logging.DEBUG)
 FORMATTER = logging.Formatter(
@@ -37,6 +39,8 @@ FORMATTER = logging.Formatter(
 LOGSTREAM = logging.StreamHandler(sys.stdout)
 LOGSTREAM.setFormatter(FORMATTER)
 LOG.addHandler(LOGSTREAM)
+
+OUTPUT_FILE = 'zone-resources.json'
 
 API_KEY = None
 IMAGE_MATCH = None
@@ -50,11 +54,15 @@ def apply():
     zones = [f.path for f in os.scandir(vpc_path) if f.is_dir()]
     for zone in zones:
         if os.path.basename(zone) in ZONES:
+            LOG.debug('applying resources in zone: %s', os.path.basename(zone))
             tf = pt.Terraform(working_dir=zone)
             tf.init()
+            key = RSA.generate(2048, os.urandom)
+            ssh_public_key = key.exportKey('OpenSSH').decode('utf-8')
+            ssh_private_key = key.export_key().decode('utf-8')
             LOG.info("running apply on %s" % zone)
-            tf.apply(var={'api_key': API_KEY},
-                     auto_approve=True, capture_output=False)
+            tf.apply(dir_or_plan=False, var={
+                     'api_key': API_KEY, 'ssh_public_key': ssh_public_key, 'ssh_private_key': ssh_private_key}, skip_plan=True, capture_output=False)
 
 
 def destroy():
@@ -62,11 +70,15 @@ def destroy():
     zones = [f.path for f in os.scandir(vpc_path) if f.is_dir()]
     for zone in zones:
         if os.path.basename(zone) in ZONES:
+            LOG.debug('destroying resources in zone: %s', os.path.basename(zone))
             tf = pt.Terraform(working_dir=zone)
             tf.init()
-            LOG.info("running destroy on %s" % zone)
-            tf.destroy(var={'api_key': API_KEY},
-                       auto_approve=True, capture_output=False)
+            tf.destroy(auto_approve=True, var={
+                       'api_key': API_KEY}, capture_output=False)
+    output_file = "%s/%s" % (os.path.dirname(
+        os.path.realpath(__file__)), OUTPUT_FILE)
+    if os.path.exists(output_file):
+        os.unlink(output_file)
 
 
 def inventory():
@@ -75,12 +87,13 @@ def inventory():
     zones = [f.path for f in os.scandir(vpc_path) if f.is_dir()]
     for zone in zones:
         if os.path.basename(zone) in ZONES:
+            LOG.debug('getting inventory in zone %s', zone)
             tf = pt.Terraform(working_dir=zone)
             tf.init()
             zout = tf.output(json=True)
             output[os.path.basename(zone)] = zout
     json_out = json.dumps(output)
-    with open("%s/output.json" % os.path.dirname(os.path.realpath(__file__)), 'w') as inventory:
+    with open("%s/%s" % (os.path.dirname(os.path.realpath(__file__)), OUTPUT_FILE), 'w') as inventory:
         inventory.write(json_out)
 
 
@@ -95,8 +108,8 @@ def clean():
         if os.path.exists(tsfb):
             os.unlink(tsfb)
         shutil.rmtree("%s/.terraform" % zone, ignore_errors=True)
-    output_file = "%s/output.json" % os.path.dirname(
-        os.path.realpath(__file__))
+    output_file = "%s/%s" % (os.path.dirname(
+        os.path.realpath(__file__)), OUTPUT_FILE)
     if os.path.exists(output_file):
         os.unlink(output_file)
 
@@ -106,7 +119,15 @@ def initialize():
     API_KEY = os.getenv('API_KEY', None)
     IMAGE_MATCH = os.getenv('IMAGE_MATCH', '^[a-zA-Z]')
     ZONES = os.getenv('ZONES', 'us-south-3')
-    ZONES = [x.strip() for x in ZONES.split(',')]
+    if ZONES == 'all':
+        all_zones = []
+        vpc_path = "%s/vpcs" % os.path.dirname(os.path.realpath(__file__))
+        zones = [f.path for f in os.scandir(vpc_path) if f.is_dir()]
+        for zone in zones:
+            all_zones.append(os.path.basename(zone))
+        ZONES = ','.join(all_zones)
+    else:
+        ZONES = [x.strip() for x in ZONES.split(',')]
 
 
 if __name__ == "__main__":

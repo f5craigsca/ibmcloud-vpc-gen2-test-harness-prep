@@ -30,6 +30,11 @@ resource "ibm_is_subnet" "f5_external" {
   total_ipv4_address_count = "256"
 }
 
+resource "ibm_is_ssh_key" "ssh_key" {
+  name       = "test-harness-${var.region}-${var.zone}-ssh"
+  public_key = var.ssh_public_key
+}
+
 output "testharness_vpc_id" {
   value = ibm_is_vpc.testharness_vpc.id
 }
@@ -68,4 +73,16 @@ output "f5_external_cidr" {
 
 output "region_zone" {
   value = "${var.region}-${var.zone}"
+}
+
+output "ssh_key_name" {
+  value = "test-harness-${var.region}-${var.zone}-ssh"
+}
+
+output "ssh_public_key" {
+  value = var.ssh_public_key
+}
+
+output "ssh_private_key" {
+  value = var.ssh_private_key
 }
